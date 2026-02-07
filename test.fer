@@ -1,0 +1,45 @@
+let io = import('std/io');
+let fs = import('std/fs');
+let os = import('std/os');
+let logging = import('std/logging');
+let argparse = import('std/argparse');
+
+let ssh = import('ssh/ssh');
+
+let args = argparse.new(feral.args);
+args.addArg('trace').addOpts('--trace', '-t').setHelp('Show trace output');
+args.addArg('host').setValReqd(true).setReqd(true).setHelp('Hostname to connect to');
+args.addArg('port').setValReqd(true).setReqd(true).setHelp('Port on the host to connect to');
+args.parse();
+
+if args.has('trace') {
+    logging.addTarget(io.stderr, logging.Levels.TRACE);
+}
+
+let conn = ssh.new(args.getValue('host'), args.getValue('port'));
+
+conn.tryConnect('');
+let remoteHome = conn.tryGetEnv('', 'HOME');
+conn.tryCopyFromRemote('', '/bin/bash', './');
+fs.remove('./bash');
+let remoteHosts = conn.tryReadFile('', '/etc/hosts').join('\n');
+io.println('-------------------------------------------------------');
+io.cprintln('{by}Contents of {bc}/etc/hosts{0}:');
+io.println('----------');
+io.println(remoteHosts);
+io.println('----------');
+io.println('-------------------------------------------------------');
+conn.tryWriteFile('', remoteHome + '/testHosts', remoteHosts);
+conn.tryAppendFile('', remoteHome + '/testHosts', '123.123.123.123 helloooooo');
+remoteHosts = conn.tryReadFile('', remoteHome + '/testHosts').join('\n');
+io.println('-------------------------------------------------------');
+io.cprintln('{by}Contents of {bc}', remoteHome, '/testHosts{0}:');
+io.println('----------');
+io.println(remoteHosts);
+io.println('----------');
+io.println('-------------------------------------------------------');
+conn.trySymLink('', remoteHome + '/testHosts', remoteHome + '/testsHosts2');
+conn.tryRemove('', remoteHome + '/testHosts', remoteHome = '/testHosts2');
+conn.tryDownload('', 'https://google.com', remoteHome + '/testDownload.html');
+conn.tryExists('', remoteHome + '/.bashrc');
+conn.tryRemove('', remoteHome + '/testDownload.html');

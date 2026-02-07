@@ -1,0 +1,6 @@
+author = 'Electrux';
+name = 'SSH';
+version = '0.0.1'; # Used to check if a package needs updating.
+description = 'SSH connection and scripting using Feral.';
+source = 'https://github.com/Feral-Lang/LibSSH';
+# depends = {};
