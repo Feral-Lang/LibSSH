@@ -14,8 +14,16 @@ let SSHCon = struct(
 );
 SSHCon.setTypeName('SSHCon');
 
-let new = fn(remote, port, user = nil, identityFile = nil) {
-    return SSHCon(remote, port, user, identityFile);
+let new = fn(remoteStr, port, .kw) {
+    let remote = remoteStr;
+    let user = '';
+    if remoteStr.find('@') >= 0 {
+        let split = remoteStr.split('@');
+        user = split[0];
+        remote = split[1];
+    }
+    let idFile = kw['identityFile'] ?? nil;
+    return SSHCon(remote, port, user, idFile);
 };
 
 let getPrefix in SSHCon = fn() {
@@ -38,32 +46,60 @@ let popDepth in SSHCon = fn() { --self.prefixCounter; };
 
 ################################ High level helpers ###############################
 
-let tryInstallFrom in SSHCon = fn(localPath, path, .kw) {
-    let data = fs.fopen(localPath).readAll();
-    return self.tryInstall(path, data, kw...);
+let tryInstall in SSHCon = fn(.kw, localPath, path) {
+    if fs.isReg(localPath.path()) {
+        return self.tryInstallFrom(kw..., localPath, path);
+    }
+    let items = fs.walkDir(localPath.path(), fs.WALK_RECURSE);
+    items.sort();
+    io.cprintln(self.getPrefix(), ' {by}Installing everything in {bc}', localPath, '{0}!');
+    let installed = 0;
+    self.pushDepth();
+    for itemPath in items.each() {
+        let item = itemPath.str();
+        if self.tryInstallFrom(kw..., item, path + item.replace(localPath, '')) { ++installed; }
+    }
+    self.popDepth();
+    if installed > 0 {
+        io.cprintln(self.getPrefix(), ' {bg}Installed {bc}', installed, '{0}/{bc}', items.len(), '{bg} items in {bc}', path, '{0}!');
+        return true;
+    }
+    io.cprintln(self.getPrefix(), ' {bg}All {bc}', items.len(), ' {bg}items are up to date in {bc}', path, '{0}!');
+    return false;
+};
+
+let tryInstallFrom in SSHCon = fn(.kw, localPath, path) {
+    let data = fs.fopen(localPath.path()).readAll().trim();
+    return self.tryInstallData(kw..., path, data);
 };
 
 '
 Makes sure the file `path` has `data`.
 Optionally takes `exclusive = true` which ensures that `data` is the only thing in the file.
 '
-let tryInstall in SSHCon = fn(path, data, .kw) {
+let tryInstallData in SSHCon = fn(.kw, path, dataTmp) {
     let isDataExclusive = kw['exclusive'] ?? false;
-    let parentDir = fs.parentDir(path);
+    let isDataTemplate = kw['templ'] ?? false;
+    inline if isDataTemplate {
+        let data = os.applyEnv(dataTmp);
+    } else {
+        let data = ref(dataTmp);
+    }
+    let parentDir = path.path().parent().str();
     io.cprintln(self.getPrefix(), ' {by}Installing {bc}', path, ' {0}...');
     self.pushDepth();
     let updated = false;
-    if !self.tryExists(path) {
-        if !self.tryExists(parentDir) { self.tryMkdir(parentdir); }
-        self.tryWriteFile(path, data);
+    if !self.tryExists(kw..., path) {
+        if !self.tryExists(kw..., parentDir) { self.tryMkdir(kw..., parentDir); }
+        self.tryWriteFile(kw..., path, data);
         updated = true;
     } else {
-        let existingData = self.tryReadFile(path).join('\n');
+        let existingData = self.tryReadFile(kw..., path).join('\n').trim();
         if (isDataExclusive && data != existingData) || (!isDataExclusive && existingData.find(data) < 0) {
             if isDataExclusive {
-                self.tryWriteFile(path, data);
+                self.tryWriteFile(kw..., path, data);
             } else {
-                self.tryWriteFile(path, existingData + '\n' + data);
+                self.tryWriteFile(kw..., path, existingData + '\n' + data);
             }
             updated = true;
         }
@@ -112,39 +148,39 @@ let tryEnd in SSHCon = fn(res, onNewline, msg...) {
     return ref(res.getVal());
 };
 
-let tryConnect in SSHCon = fn() {
+let tryConnect in SSHCon = fn(.kw) {
     self.tryBegin(false, 'Connecting to remote');
-    let res = self.tryEnd(self.connect(), false, 'success');
+    let res = self.tryEnd(self.connect(kw...), false, 'success');
     return ref(res);
 };
 
-let tryGetEnv in SSHCon = fn(varName) {
+let tryGetEnv in SSHCon = fn(.kw, varName) {
     self.tryBegin(false, 'Getting env var{0}: {bc}', varName);
-    let res = self.tryEnd(self.getEnv(varName), false, 'success');
+    let res = self.tryEnd(self.getEnv(kw..., varName), false, 'success');
     return ref(res);
 };
 
-let tryCopyFromRemote in SSHCon = fn(srcPath, destPath) {
+let tryCopyFromRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return ref(self.tryCopy(conStr + ':' + srcPath, destPath));
+    return ref(self.tryCopy(kw..., conStr + ':' + srcPath, destPath));
 };
 
-let tryCopyToRemote in SSHCon = fn(srcPath, destPath) {
+let tryCopyToRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return ref(self.tryCopy(srcPath, conStr + ':' + destPath));
+    return ref(self.tryCopy(kw..., srcPath, conStr + ':' + destPath));
 };
 
-let tryCopyInRemote in SSHCon = fn(srcPath, destPath) {
+let tryCopyInRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return ref(self.tryCopy(conStr + ':' + srcPath, conStr + ':' + destPath));
+    return ref(self.tryCopy(kw..., conStr + ':' + srcPath, conStr + ':' + destPath));
 };
 
-let trySymLink in SSHCon = fn(srcPath, destPath) {
+let trySymLink in SSHCon = fn(.kw, srcPath, destPath) {
     io.cprintln(self.getPrefix(), ' {by}Symlinking to{0}: {bc}', destPath);
     self.pushDepth();
     if !self.tryExists(destPath) {
         self.tryBegin(false, 'Creating link{0}: {bc}', destPath, ' {by}-> {bc}', srcPath);
-        let res = self.tryEnd(self.symLink(srcPath, destPath), false, 'success');
+        let res = self.tryEnd(self.symLink(kw..., srcPath, destPath), false, 'success');
         self.popDepth();
         return ref(res);
     }
@@ -153,45 +189,45 @@ let trySymLink in SSHCon = fn(srcPath, destPath) {
     return result.ok();
 };
 
-let tryRemove in SSHCon = fn(items...) {
+let tryRemove in SSHCon = fn(.kw, items...) {
     self.tryBegin(false, 'Deleting{0}: {bc}', items.join('{0}, {bc}'));
-    let res = self.tryEnd(self.remove(items...), false, 'success');
+    let res = self.tryEnd(self.remove(kw..., items...), false, 'success');
     return ref(res);
 };
 
-let tryMkdir in SSHCon = fn(items...) {
+let tryMkdir in SSHCon = fn(.kw, items...) {
     self.tryBegin(false, 'Creating directories{0}: {bc}', items.join('{0}, {bc}'));
-    let res = self.tryEnd(self.mkdir(items...), false, 'success');
+    let res = self.tryEnd(self.mkdir(kw..., items...), false, 'success');
     return ref(res);
 };
 
-let tryExists in SSHCon = fn(item) {
+let tryExists in SSHCon = fn(.kw, item) {
     self.tryBegin(false, 'Checking if path exists{0}: {bc}', item);
-    let res = self.tryEnd(self.exists(item), false, fn(val) { return val ? 'yes' : 'no'; });
+    let res = self.tryEnd(self.exists(kw..., item), false, fn(val) { return val ? 'yes' : 'no'; });
     return ref(res);
 };
 
-let tryReadFile in SSHCon = fn(path) {
+let tryReadFile in SSHCon = fn(.kw, path) {
     self.tryBegin(false, 'Reading file{0}: {bc}', path);
-    let res = self.tryEnd(self.readFile(path), false, 'success');
+    let res = self.tryEnd(self.readFile(kw..., path), false, 'success');
     return ref(res);
 };
 
-let tryWriteFile in SSHCon = fn(path, data) {
+let tryWriteFile in SSHCon = fn(.kw, path, data) {
     self.tryBegin(false, 'Writing data to file{0}: {bc}', path);
-    let res = self.tryEnd(self.writeFile(path, data), false, 'success');
+    let res = self.tryEnd(self.writeFile(kw..., path, data), false, 'success');
     return ref(res);
 };
 
-let tryAppendFile in SSHCon = fn(path, data) {
+let tryAppendFile in SSHCon = fn(.kw, path, data) {
     self.tryBegin(false, 'Appending data to file{0}: {bc}', path);
-    let res = self.tryEnd(self.appendFile(path, data), false, 'success');
+    let res = self.tryEnd(self.appendFile(kw..., path, data), false, 'success');
     return ref(res);
 };
 
-let tryDownload in SSHCon = fn(url, destPath) {
+let tryDownload in SSHCon = fn(.kw, url, destPath) {
     self.tryBegin(false, 'Downloading{0}: {bc}', destPath);
-    let res = self.tryEnd(self.download(url, destPath), false, 'success');
+    let res = self.tryEnd(self.download(kw..., url, destPath), false, 'success');
     return ref(res);
 };
 
@@ -206,94 +242,94 @@ let tryRun in SSHCon = fn(.kw, cmd...) {
     return ref(res);
 };
 
-let tryCopy in SSHCon = fn(src, dest) {
+let tryCopy in SSHCon = fn(.kw, src, dest) {
     self.tryBegin(false, 'Copying{0}: {bc}', src, ' {by}-> ', '{bc}', dest);
-    let res = self.tryEnd(self.copy(src, dest), false, 'success');
+    let res = self.tryEnd(self.copy(kw..., src, dest), false, 'success');
     return ref(res);
 };
 
 ################################# Core Functions ##################################
 
-let connect in SSHCon = fn() {
+let connect in SSHCon = fn(.kw) {
     let out = '';
-    return self.run(out = out, 'echo', 'test');
+    return self.run(kw..., out = out, 'echo', 'test');
 };
 
-let getEnv in SSHCon = fn(varName) {
+let getEnv in SSHCon = fn(.kw, varName) {
     let out = '';
-    let res = self.run(out = out, 'echo', '\\$' + varName);
+    let res = self.run(kw..., out = out, 'echo', '\\$' + varName);
     return res.isOk() ? result.ok(out) : res;
 };
 
-let copyFromRemote in SSHCon = fn(srcPath, destPath) {
+let copyFromRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return self.copy(conStr + ':' + srcPath, destPath);
+    return self.copy(kw..., conStr + ':' + srcPath, destPath);
 };
 
-let copyToRemote in SSHCon = fn(srcPath, destPath) {
+let copyToRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return self.copy(srcPath, conStr + ':' + destPath);
+    return self.copy(kw..., srcPath, conStr + ':' + destPath);
 };
 
-let copyInRemote in SSHCon = fn(srcPath, destPath) {
+let copyInRemote in SSHCon = fn(.kw, srcPath, destPath) {
     let conStr = self.getConStr();
-    return self.copy(conStr + ':' + srcPath, conStr + ':' + destPath);
+    return self.copy(kw..., conStr + ':' + srcPath, conStr + ':' + destPath);
 };
 
-let symLink in SSHCon = fn(srcPath, destPath) {
+let symLink in SSHCon = fn(.kw, srcPath, destPath) {
     let out = '';
-    let res = self.run(out = out, 'ln', '-sf', srcPath, destPath);
+    let res = self.run(kw..., out = out, 'ln', '-sf', srcPath, destPath);
     return res.isOk() ? result.ok() : res;
 };
 
-let remove in SSHCon = fn(items...) {
-    return self.run('rm', '-rf', items...);
+let remove in SSHCon = fn(.kw, items...) {
+    return self.run(kw..., 'rm', '-rf', items...);
 };
 
-let mkdir in SSHCon = fn(items...) {
-    return self.run('mkdir', '-p', items...);
+let mkdir in SSHCon = fn(.kw, items...) {
+    return self.run(kw..., 'mkdir', '-p', items...);
 };
 
-let exists in SSHCon = fn(item) {
+let exists in SSHCon = fn(.kw, item) {
     let out = '';
-    let res = self.run(out = out, 'test', '-e', item, '&&', 'echo', 'yes', '||', 'echo', 'no');
+    let res = self.run(kw..., out = out, 'test', '-e', item, '&&', 'echo', 'yes', '||', 'echo', 'no');
     if res.isOk() { return result.ok(out == 'yes' ? true : false); }
     return res;
 };
 
-let readFile in SSHCon = fn(path) {
+let readFile in SSHCon = fn(.kw, path) {
     let out = vec.new(refs = true);
-    let res = self.run(out = out, 'cat', path);
+    let res = self.run(kw..., out = out, 'cat', path);
     return res.isOk() ? result.ok(out) : res;
 };
 
-let writeFile in SSHCon = fn(path, data) {
-    let tmpFile = fs.pathFrom(feral.tempPath, 'remoteWrite-' + path.replace('/', '-'));
-    io.fprint(fs.fopen(tmpFile, 'w+'), data);
-    let res = self.copyToRemote(tmpFile, path);
-    fs.remove(tmpFile);
+let writeFile in SSHCon = fn(.kw, path, data) {
+    let tmpFile = feral.tempPath.str() + '/remoteWrite-' + path.replace('/', '-');
+    io.fprint(fs.fopen(tmpFile.path(), 'w+'), data);
+    let res = self.copyToRemote(kw..., tmpFile, path);
+    fs.remove(tmpFile.path());
     return res;
 };
 
-let appendFile in SSHCon = fn(path, data) {
-    let tmpFile = fs.pathFrom(feral.tempPath, 'remoteAppend-' + path.replace('/', '-'));
+let appendFile in SSHCon = fn(.kw, path, data) {
+    let tmpFile = feral.tempPath.str() + 'remoteAppend-' + path.replace('/', '-');
     logging.debug('Appending using temp file: ', tmpFile);
-    let res = self.readFile(path);
+    let res = self.readFile(kw..., path);
     if res.isOk() {
-        let f = fs.fopen(tmpFile, 'w+');
+        let f = fs.fopen(tmpFile.path(), 'w+');
         io.fprint(f, res.getVal().join('\n'), '\n', data);
     } else {
-        let f = fs.fopen(tmpFile, 'w+');
+        let f = fs.fopen(tmpFile.path(), 'w+');
         io.fprint(f, data);
     }
-    let res = self.copyToRemote(tmpFile, path);
-    fs.remove(tmpFile);
+    let res = self.copyToRemote(kw..., tmpFile, path);
+    fs.remove(tmpFile.path());
     return res;
 };
 
-let download in SSHCon = fn(url, destPath) {
+let download in SSHCon = fn(.kw, url, destPath) {
     let out = '';
-    return self.run(out = out, 'wget', url, '-O', destPath);
+    return self.run(kw..., out = out, 'curl', '-sL', '-o', destPath, url);
 };
 
 let run in SSHCon = fn(.kw, command...) {
@@ -302,11 +338,13 @@ let run in SSHCon = fn(.kw, command...) {
         return result.err(1, 'No remote provided!');
     }
     let output = ref(kw['out']);
+    let sudo = kw['sudo'] ?? false;
     let conStr = self.getConStr();
     let cmd = vec.new(refs = true, 'ssh', conStr, '-p', self.port);
     if self.identityFile != nil {
         cmd.push('-i', self.identityFile);
     }
+    if sudo { cmd.push('sudo'); }
     cmd.append(command);
     cmd.push('^2>&1');
     logging.debug('Command: ', cmd.join(' '));
@@ -325,11 +363,53 @@ let run in SSHCon = fn(.kw, command...) {
     return result.ok();
 };
 
-let copy in SSHCon = fn(src, dest) {
+let copy in SSHCon = fn(.kw, src, dest) {
     if self.remote.empty() {
         logging.fatal('No remote provided!');
         return result.err(1, 'No remote provided!');
     }
+    let sudo = kw['sudo'] ?? false;
+    let skipLen = self.remote.len() + 1; # 1 for colon
+    let srcRemote = src.find(self.remote + ':');
+    let destRemote = dest.find(self.remote + ':');
+    let scpCmd = vec.new(refs = true);
+    if srcRemote >= 0 && destRemote >= 0 {
+        # just regular (sudo) cp
+        return self.run(kw..., out = out, desc = 'Copying within remote', 'cp', '-r', src.sub(srcRemote + 1), dest.sub(destRemote + 1));
+    } elif srcRemote >= 0 {
+        # (sudo cp from remote src to remote tmp)
+        # scp from remote tmp/src to local dest
+        let localSrc = src.sub(srcRemote + skipLen);
+        let localTmp = '/tmp/' + localSrc.replace('/', '@@');
+        if sudo {
+            let out = '';
+            let res = self.run(kw..., out = out, desc = 'Copying to temp file', 'cp', '-r', localSrc, localTmp);
+            if !res.isOk() { return ref(res); }
+            out = '';
+            let res = self.run(kw..., out = out, desc = 'Updating temp file permissions', 'chmod', '-R', '+rx', localTmp);
+            if !res.isOk() { return ref(res); }
+            localSrc = localTmp;
+        }
+        let res = self.scp(self.getConStr() + ':' + localSrc, dest);
+        if !sudo || !res.isOk() { return res; }
+        return self.remove(kw..., localTmp);
+    }
+    # scp from local src to remote tmp/dest
+    # (sudo cp from remote tmp to remote dest)
+    let localDest = dest.sub(destRemote + skipLen);
+    let tmpDest = localDest;
+    if sudo {
+        tmpDest = '/tmp/' + tmpDest.replace('/', '@@');
+    }
+    let res = self.scp(src, self.getConStr() + ':' + tmpDest);
+    if !sudo || !res.isOk() { return res; }
+    let out = '';
+    let res = self.run(kw..., out = out, desc = 'Copying from temp file', 'cp', '-r', tmpDest, localDest);
+    if !res.isOk() { return res; }
+    return self.remove(kw..., tmpDest);
+};
+
+let scp in SSHCon = fn(src, dest) {
     let cmd = vec.new(refs = true, 'scp', '-P', self.port);
     if self.identityFile != nil {
         cmd.push('-i', self.identityFile);
@@ -348,7 +428,7 @@ let copy in SSHCon = fn(src, dest) {
 
 let getConStr in SSHCon = fn() {
     let conStr = '';
-    if self.user != nil {
+    if self.user != nil && !self.user.empty() {
         conStr += self.user + '@';
     }
     conStr += self.remote;
