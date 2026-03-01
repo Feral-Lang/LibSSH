@@ -5,42 +5,35 @@ let argparse = import('std/argparse');
 
 let ssh = import('ssh/ssh');
 
+let try = fn(res, msg...) {
+    io.print('==> ', msg..., ' ... ');
+    if res.isOk() {
+        io.println('success!');
+        return res.getVal();
+    }
+    io.println('failed!');
+    raise('error (', res.getVal().getCode(), '): ', res.getVal().getMsg());
+};
+
 let args = argparse.new(feral.args);
 args.addArg('host').setValReqd(true).setReqd(true).setHelp('Hostname to connect to');
 args.addArg('port').setValReqd(true).setReqd(true).setHelp('Port on the host to connect to');
 args.parse();
 
 let conn = ssh.new();
-conn.setOpt(ssh.OPT_HOST, args.getValue('host'));
-conn.setOpt(ssh.OPT_PORT, args.getValue('port').int());
-conn.setOpt(ssh.OPT_LOG_VERBOSITY, ssh.LOG_FUNCTIONS);
-io.println('==> Connecting ...');
-let rc = conn.connect();
-if rc != ssh.OK {
-    io.println('==> failed: ', conn.getError());
-    feral.exit(rc);
-}
-io.println('==> connected successfully!');
-let key = ssh.newKey();
-io.println('==> retrieving public key ...');
-rc = conn.getServerPublicKey(key);
-if rc != ssh.OK {
-    io.println('==> failed to get server public key: ', conn.getError());
-    feral.exit(rc);
-}
-io.println('==> retrieved key successfully!');
-let hash = '';
-rc = key.getPublicKeyHash(hash);
-io.println('==> getting key hash ...');
-if rc != ssh.OK {
-    io.println('==> failed to get public key hash: ', conn.getError());
-    feral.exit(rc);
-}
-io.println('==> received hash: ', hash);
-
+try(conn.setOpt(ssh.OPT_HOST, args.getValue('host')), 'setting host');
+try(conn.setOpt(ssh.OPT_PORT, args.getValue('port').int()), 'setting port');
+try(conn.setOpt(ssh.OPT_LOG_VERBOSITY, ssh.LOG_FUNCTIONS), 'setting log verbosity');
+try(conn.connect(), 'connecting');
+let key = try(conn.getServerPublicKey(), 'retrieving public key');
+let hash = try(key.getHash(), 'getting key hash');
 let knownHostsState = conn.isKnownServer();
 io.println('==> connection known hosts state: ', ssh.knownHostsStateStr(knownHostsState));
-
-io.println('==> disconnecting ...');
+try(ssh.verifyKnownHost(conn), 'verifying known hosts');
+try(ssh.authenticate(conn), 'authenticating');
+io.print('==> getting banner ... ');
+let banner = conn.getIssueBanner();
+io.println('success!');
+io.println('==> banner: ', banner);
 conn.disconnect();
-io.println('==> disconnected successfully!');
+io.println('==> disconnected!');

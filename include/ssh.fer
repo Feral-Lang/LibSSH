@@ -1,7 +1,9 @@
 loadlib('ssh/SSH');
 
 let io = import('std/io');
+let os = import('std/os');
 let vec = import('std/vec');
+let result = import('std/result');
 
 let logStr = vec.new(refs = true,
     'nolog',
@@ -33,6 +35,295 @@ let defaultLogCB = fn(session, prio, func, msg) {
     io.ecprintln('[{m}', func, '{0}]', '[', logColStr[prio], '{0}]', ': ', msg);
 };
 
+###################################################################################################
+######################################## SSH Session ##############################################
+###################################################################################################
+
 let _init_ in SSHSessionTy = fn() {
     self.setLogCB(defaultLogCB);
+};
+
+"
+  var.fn() -> Result
+Connect to the SSH remote associated with session `var`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let connect in SSHSessionTy = fn() {
+    let rc = self.connectNative();
+    if rc != OK {
+        return result.err(rc, 'failed to connect: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(opt, value) -> Result
+Set the option `opt` as `value` for session `var`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let setOpt in SSHSessionTy = fn(opt, val) {
+    let rc = self.setOptNative(opt, val);
+    if rc != OK {
+        return result.err(rc, 'failed to set option: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn() -> Result
+Get the remote's public key associated with the session `var`.
+Returns `Result.ok(key)` on success, `Result.err(code, msg)` on failure.
+"
+let getServerPublicKey in SSHSessionTy = fn() {
+    let key = newKey();
+    let rc = self.getServerPublicKeyNative(key);
+    if rc != OK {
+        return result.err(rc, 'failed to get server public key: ', self.getError());
+    }
+    return result.ok(ref(key));
+};
+
+"
+  var.fn() -> Result
+Updates the known hosts for remote `var` locally.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let updateKnownHosts in SSHSessionTy = fn() {
+    let rc = self.updateKnownHostsNative();
+    if rc != OK {
+        return result.err(rc, 'failed to update known hosts: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn() -> Result
+Attempts to perform user authentication without any credentials.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authNone in SSHSessionTy = fn() {
+    let rc = self.authNoneNative();
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to perform none-authentication: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(publicKey) -> Result
+Checks if authentication can be performed using `publicKey`.
+If this succeeds, `var.authPublicKey()` should be used to actually authenticate.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authTryPublicKey in SSHSessionTy = fn(publicKey) {
+    let rc = self.authTryPublicKeyNative(publicKey);
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to authenticate using public key: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(privateKey) -> Result
+Attempts to authenticate using `privateKey`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authPublicKey in SSHSessionTy = fn(privateKey) {
+    let rc = self.authPublicKeyNative(privateKey);
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to authenticate using private key: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(passphrase = nil) -> Result
+Attempts to auto authenticate using the public keys from the running ssh agent.
+A `passphrase` string can be provided if required to decrypt one of the private keys.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authPublicKeyAuto in SSHSessionTy = fn(passphrase = nil) {
+    let rc = self.authPublicKeyAutoNative(passphrase);
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to auto authenticate using public keys: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(password) -> Result
+Attempts to authenticate using the given `password`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authPassword in SSHSessionTy = fn(password) {
+    let rc = self.authPublicKeyAutoNative(password);
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to authenticate using password: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn() -> Result
+Attempts to perform user authentication using keyboard-interactive method.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+Note that the error code `AUTH_INFO` should be handled using interactive authentication - `var.authKbdIntGetNPrompts()`.
+"
+let authKbdInt in SSHSessionTy = fn() {
+    let rc = self.authKbdIntNative();
+    if rc == AUTH_INFO {
+        return result.err(rc, 'must continue interactive login by calling member function `authKbdIntGetNPrompts()`');
+    }
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed to authenticate using password: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(index, answer) -> Result
+Provide `answer` for the prompt at `index`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authKbdIntSetAnswer in SSHSessionTy = fn(index, answer) {
+    return self.authKbdIntSetAnswerNative(index, answer);
+    if rc != AUTH_SUCCESS {
+        return result.err(rc, 'failed using answer for prompt: ', self.getError());
+    }
+    return result.ok();
+};
+
+###################################################################################################
+########################################## SSH Key ################################################
+###################################################################################################
+
+"
+  var.fn() -> Result
+Get the key `var`'s hash as a string.
+Returns `Result.ok(hash)` on success, `Result.err(code, msg)` on failure.
+"
+let getHash in SSHKeyTy = fn() {
+    let hash = '';
+    let rc = self.getHashNative(hash);
+    if rc != OK {
+        return result.err(rc, 'failed to get hash: ', self.getError());
+    }
+    return result.ok(hash);
+};
+
+"
+  var.fn(filePath) -> Result
+Imports a public key from the given `filePath`.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let importPublic in SSHKeyTy = fn(filePath) {
+    let rc = self.importPublicNative(filePath);
+    if rc != OK {
+        return result.err(rc, 'failed to import public key: ', self.getError());
+    }
+    return result.ok();
+};
+
+"
+  var.fn(filePath, passphrase = nil) -> Result
+Imports a private key from the given `filePath`, optionally using `passphrase` string if provided.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let importPrivate in SSHKeyTy = fn(filePath, passphrase = nil) {
+    let rc = self.importPrivateNative(filePath, passphrase);
+    if rc != OK {
+        return result.err(rc, 'failed to import private key: ', self.getError());
+    }
+    return result.ok();
+};
+
+###################################################################################################
+########################################## Utility ################################################
+###################################################################################################
+
+"
+  fn(session) -> Result
+Verifies if the remote host is known. Interacts with the user to make it known if needed.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let verifyKnownHost = fn(session) {
+    let keyRes = session.getServerPublicKey();
+    if !keyRes.isOk() { return keyRes; }
+    let hashRes = keyRes.getVal().getHash();
+    if !hashRes.isOk() { return hashRes; }
+    let knownState = session.isKnownServer();
+    if knownState == KNOWN_HOSTS_OK { return result.ok(); }
+    if knownState == KNOWN_HOSTS_CHANGED {
+        return result.err(knownState, 'known hosts hash for the server has changed, the new value is: ', hash);
+    }
+    if knownState == KNOWN_HOSTS_OTHER {
+        let e = 'host key for this server was not found, but other exists;';
+        e += ' might be an attacker who changed the default server key to confuse your client';
+        return result.err(knownState, e);
+    }
+    if knownState == KNOWN_HOSTS_NOT_FOUND || knownState == KNOWN_HOSTS_UNKNOWN {
+        if knownState == KNOWN_HOSTS_NOT_FOUND {
+            io.println(prefix, 'could not find known hosts file, will automatically create it if trusted');
+        }
+        io.println(prefix, 'server unknown, do you trust the host key with hash: ', hash, '?');
+        let input = io.scan('yes', 'no', icase = true);
+        if input.lower() == 'no' {
+            return result.err(knownState, 'not updating known hosts');
+        }
+        rc = session.updateKnownHosts();
+        if rc != OK {
+            return result.err(rc, 'failed to update known hosts: ', os.strErr());
+        }
+        return result.ok();
+    }
+    # knownState == KNOWN_HOSTS_ERROR
+    return result.err(knownState, 'ssh error: ', session.getError());
+};
+
+"
+  fn(session) -> Result
+Attempts to authenticate using various methods.
+Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
+"
+let authenticate = fn(session) {
+    # authNone must be called before authList()
+    let res = session.authNone();
+    if res.isOk() || res.getVal().getCode() == ERROR { return res; }
+    let methods = session.authList();
+    if methods & AUTH_METHOD_NONE {
+        let res = session.authNone();
+        if res.isOk() { return res; }
+    }
+    if methods & AUTH_METHOD_PUBLICKEY {
+        let res = session.authPublicKeyAuto();
+        if res.isOk() { return res; }
+    }
+    if methods & AUTH_METHOD_INTERACTIVE {
+        let res = session.authKbdInt();
+        while res.isErr() && res.getVal().getCode() == AUTH_INFO {
+            let nprompts = session.authKbdIntGetNPrompts();
+            let name = session.authKbdIntGetName();
+            let instr = session.authKbdIntGetInstruction();
+            if !name.empty() { io.println(name); }
+            if !instr.empty() { io.println(instr); }
+            for let i = 0; i < nprompts; ++i {
+                let echo = false;
+                let prompt = session.authKbdIntGetPrompt(i, echo);
+                if echo { io.println(prompt); }
+                let buffer = io.scan(hide = !echo);
+                buffer = buffer.split('\n')[0];
+                let tmpRes = session.authKbdIntSetAnswer(i, buffer);
+                if !tmpRes.isOk() { return tmpRes; }
+            }
+            res = session.authKbdInt();
+        }
+        if res.isOk() { return res; }
+    }
+    if methods & AUTH_METHOD_PASSWORD {
+        io.print('Enter password: ');
+        let password = io.scan(hide = true);
+        let res = session.authPassword(password);
+        if res.isOk() { return res; }
+    }
+    return result.err(AUTH_ERROR, 'failed to authenticate');
 };
