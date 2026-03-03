@@ -1,45 +1,69 @@
 let io = import('std/io');
 let fs = import('std/fs');
 let os = import('std/os');
-let logging = import('std/logging');
 let argparse = import('std/argparse');
 
 let ssh = import('ssh/ssh');
 
+let try = fn(res, msg...) {
+    io.print('==> ', msg..., ' ... ');
+    if res.isOk() {
+        io.println('success!');
+        return res.getVal();
+    }
+    io.println('failed!');
+    raise('error (', res.getVal().getCode(), '): ', res.getVal().getMsg());
+};
+
 let args = argparse.new(feral.args);
-args.addArg('trace').addOpts('--trace', '-T').setHelp('Show trace output');
 args.addArg('host').setValReqd(true).setReqd(true).setHelp('Hostname to connect to');
-args.addArg('port').setValReqd(true).setReqd(true).setHelp('Port on the host to connect to');
+args.addArg('port').setValReqd(true).setHelp('Port on the host to connect to');
 args.parse();
 
-if args.has('trace') {
-    logging.addTarget(io.stderr, logging.Levels.TRACE);
+let conn = ssh.new();
+try(conn.setOpt(ssh.OPT_HOST, args.getValue('host')), 'setting host');
+if args.has('port') { try(conn.setOpt(ssh.OPT_PORT, args.getValue('port').int()), 'setting port'); }
+try(conn.setOpt(ssh.OPT_LOG_VERBOSITY, ssh.LOG_WARNING), 'setting log verbosity');
+try(conn.connect(), 'connecting');
+let key = try(conn.getServerPublicKey(), 'retrieving public key');
+let hash = try(key.getHash(), 'getting key hash');
+let knownHostsState = conn.isKnownServer();
+io.println('==> connection known hosts state: ', ssh.knownHostsStateStr(knownHostsState));
+try(ssh.verifyKnownHost(conn), 'verifying known hosts');
+try(ssh.authenticate(conn), 'authenticating');
+io.print('==> getting banner ... ');
+let banner = conn.getIssueBanner();
+io.println('success!');
+io.println('==> banner: ', banner);
+let chan = try(conn.openChannel(), 'opening channel');
+io.println('==> channel is valid: ', chan.isValid());
+io.println('==> channel is open: ', chan.isOpen());
+for let i = 0; i < 1; ++i {
+    let out = '', err = '';
+    let exitCode = try(chan.exec('echo $SHELL && ls -lAh >&2', out = out, err = err), 'running command');
+    io.println('==> command exit code: ', exitCode);
+    io.println('==> stdout:');
+    io.println(out);
+    io.println('==> stderr:');
+    io.println(err);
 }
+let homePath = '';
+try(chan.exec('echo $HOME', out = homePath), 'getting $HOME');
+io.println('==> $HOME => ', homePath);
 
-let conn = ssh.new(args.getValue('host'), args.getValue('port'));
+############################## SFTP ##############################
 
-conn.tryConnect();
-let remoteHome = conn.tryGetEnv('HOME');
-conn.tryCopyFromRemote(sudo = true, '/bin/bash', './bash');
-fs.remove('./bash'.path());
-let remoteHosts = conn.tryReadFile('/etc/hosts').join('\n');
-io.println('-------------------------------------------------------');
-io.cprintln('{by}Contents of {bc}/etc/hosts{0}:');
-io.println('----------');
-io.println(remoteHosts);
-io.println('----------');
-io.println('-------------------------------------------------------');
-conn.tryWriteFile(remoteHome + '/testHosts', remoteHosts);
-conn.tryAppendFile(remoteHome + '/testHosts', '123.123.123.123 helloooooo');
-remoteHosts = conn.tryReadFile(remoteHome + '/testHosts').join('\n');
-io.println('-------------------------------------------------------');
-io.cprintln('{by}Contents of {bc}', remoteHome, '/testHosts{0}:');
-io.println('----------');
-io.println(remoteHosts);
-io.println('----------');
-io.println('-------------------------------------------------------');
-conn.trySymLink(remoteHome + '/testHosts', remoteHome + '/testHosts2');
-conn.tryRemove(remoteHome + '/testHosts', remoteHome + '/testHosts2');
-conn.tryDownload('https://google.com', remoteHome + '/testDownload.html');
-conn.tryExists(remoteHome + '/.bashrc');
-conn.tryRemove(remoteHome + '/testDownload.html');
+let sftp = try(conn.initSFTP(), 'initializing SFTP');
+let f = sftp.openFile(homePath / '.zshrc');
+let zshrcData = try(sftp.readFile(f), 'reading ~/.zshrc');
+let tmpF = sftp.openFile(homePath / '.zshrcTmp', fs.O_CREAT | fs.O_WRONLY, 0600);
+io.println('==> contents:\n', zshrcData);
+let written = try(sftp.writeFile(tmpF, zshrcData), 'writing ~/.zshrcTmp');
+io.println('==> written ~/.zshrcTmp: ', written, ' bytes');
+
+try(chan.exec('rm ~/.zshrcTmp'), 'removing ~/.zshrcTmp');
+try(chan.close(), 'closing channel');
+io.println('==> channel is open: ', chan.isOpen());
+conn.disconnect();
+io.println('==> disconnected!');
+io.println('==> channel is valid: ', chan.isValid());
