@@ -1,1 +1,9 @@
-# Nothing here!
+let builder = import('pkg/builder');
+
+let project = builder.get();
+
+let libSSH = project.findPackage('LIBSSH');
+libSSH.setTargetLinkName('ssh');
+
+let feralSSH = project.addLibrary('SSH', 'SSH.cpp'); # `src/` is not needed here
+feralSSH.dependsOn(libSSH);
