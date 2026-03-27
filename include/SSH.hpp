@@ -71,7 +71,7 @@ public:
     int open();
     int close();
 
-    int read(VarStr *output, bool readStderr);
+    int read(VarStr *output, VarInt *timeoutMS, bool readStderr);
     int write(StringRef data, bool writeStderr);
 
     inline int requestPty(VarInt *width, VarInt *height)

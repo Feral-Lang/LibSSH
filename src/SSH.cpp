@@ -59,14 +59,15 @@ int VarSSHChannelRef::close()
     return ssh_channel_close(val);
 }
 
-int VarSSHChannelRef::read(VarStr *output, bool readStderr)
+int VarSSHChannelRef::read(VarStr *output, VarInt *timeoutMS, bool readStderr)
 {
     String &data = output->getVal();
+    int timeout  = timeoutMS->getVal();
     char buffer[128];
     int nbytes = sizeof(buffer);
     // Loop is so that if full buffer is read, assume more may be present and read it.
     while(nbytes == sizeof(buffer)) {
-        nbytes = ssh_channel_read(val, buffer, sizeof(buffer), readStderr ? 1 : 0);
+        nbytes = ssh_channel_read_timeout(val, buffer, sizeof(buffer), readStderr ? 1 : 0, timeout);
         if(nbytes > 0) data.append(buffer, nbytes);
     }
     return nbytes;
@@ -647,18 +648,21 @@ FERAL_FUNC(channelRequestSFTPNative, 0, false,
     return vm.makeVar<VarInt>(loc, chan->requestSFTP());
 }
 
-FERAL_FUNC(channelReadNative, 2, false,
-           "  var.fn(data, fromStderr = false) -> Int\n"
+FERAL_FUNC(channelReadNative, 3, false,
+           "  var.fn(data, fromStderr, timeoutMS) -> Int\n"
            "Read data from the channel `var` into `data`.\n"
            "If `fromStderr` is `true`, the data is read from `stderr`.\n"
+           "If `timeoutMS` is `-1`, the read will block indefinitely.\n"
            "Returns number of bytes read on success, SSH_ERROR on failure.")
 {
     EXPECT(VarStr, args[1], "data");
     EXPECT(VarBool, args[2], "from stderr");
+    EXPECT(VarInt, args[3], "timeout milliseconds");
     VarSSHChannelRef *chan = as<VarSSHChannelRef>(args[0]);
     VarStr *data           = as<VarStr>(args[1]);
     VarBool *fromStderr    = as<VarBool>(args[2]);
-    return vm.makeVar<VarInt>(loc, chan->read(data, fromStderr->getVal()));
+    VarInt *timeoutMS      = as<VarInt>(args[3]);
+    return vm.makeVar<VarInt>(loc, chan->read(data, timeoutMS, fromStderr->getVal()));
 }
 
 FERAL_FUNC(channelWriteNative, 2, false,

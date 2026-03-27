@@ -18,11 +18,13 @@ let try = fn(res, msg...) {
 let args = argparse.new(feral.args);
 args.addArg('host').setValReqd(true).setReqd(true).setHelp('Hostname to connect to');
 args.addArg('port').setValReqd(true).setHelp('Port on the host to connect to');
+args.addArg('user').setValReqd(true).setHelp('User on the host to connect to');
 args.parse();
 
 let conn = ssh.new();
 try(conn.setOpt(ssh.OPT_HOST, args.getValue('host')), 'setting host');
 if args.has('port') { try(conn.setOpt(ssh.OPT_PORT, args.getValue('port').int()), 'setting port'); }
+if args.has('user') { try(conn.setOpt(ssh.OPT_USER, args.getValue('user')), 'setting user'); }
 try(conn.setOpt(ssh.OPT_LOG_VERBOSITY, ssh.LOG_WARNING), 'setting log verbosity');
 try(conn.connect(), 'connecting');
 let key = try(conn.getServerPublicKey(), 'retrieving public key');
@@ -35,9 +37,11 @@ io.print('==> getting banner ... ');
 let banner = conn.getIssueBanner();
 io.println('success!');
 io.println('==> banner: ', banner);
-let chan = try(conn.openChannel(), 'opening channel');
+let motd = '';
+let chan = try(conn.openChannel(motd = motd), 'opening channel');
 io.println('==> channel is valid: ', chan.isValid());
 io.println('==> channel is open: ', chan.isOpen());
+io.println('==> size of the MOTD: ', motd.len());
 for let i = 0; i < 1; ++i {
     let out = '', err = '';
     let exitCode = try(chan.exec('echo $SHELL && ls -lAh >&2', out = out, err = err), 'running command');

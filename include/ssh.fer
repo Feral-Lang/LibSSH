@@ -162,7 +162,7 @@ Attempts to authenticate using the given `password`.
 Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 "
 let authPassword in SSHSessionTy = fn(password) {
-    let rc = self.authPublicKeyAutoNative(password);
+    let rc = self.authPasswordNative(password);
     if rc != AUTH_SUCCESS {
         return result.err(rc, 'failed to authenticate using password: ', self.getError());
     }
@@ -207,6 +207,7 @@ Optionally takes the following arguments:
 * `interactive = true` to make an interactive channel. With this, any data written to the channel will also show up to be read.
 *   This is usually only useful for having interactive remote sessions. For using SSH programmatically, this is best kept `false`.
 * `type = 'shell' / 'sftp'` to open the channel as either of the values.
+* `motd = <motd>` to set the variable in which message of the day is stored.
 * `width = <x>` to set the channel's number of columns as `x`. Only works when `interactive = true`.
 * `height = <y>` to set the channel's number of rows as `y`. Only works when `interactive = true`.
 "
@@ -228,6 +229,8 @@ let openChannel in SSHSessionTy = fn(.kw) {
     }
     if requestType == 'shell' {
         rc = chan.requestShellNative();
+        let motd = ref(kw['motd']) ?? '';
+        chan.readNative(motd, false, 250);
     } elif requestType == 'sftp' {
         rc = chan.requestSFTPNative();
     }
@@ -329,7 +332,7 @@ let read in SSHChannelTy = fn(.kw) {
     let tmp = '';
     while self.isValid() && self.isOpen() && !self.isEOF() {
         let buf = '';
-        let bytes = self.readNative(buf, false);
+        let bytes = self.readNative(buf, false, -1);
         if bytes < OK {
             return result.err(bytes, 'failed to read stdout data from channel: ', self.getError());
         }
@@ -354,7 +357,7 @@ let read in SSHChannelTy = fn(.kw) {
     }
     while self.isValid() && self.isOpen() && !self.isEOF() {
         let buf = '';
-        let bytes = self.readNative(buf, true);
+        let bytes = self.readNative(buf, true, -1);
         if bytes < OK {
             return result.err(bytes, 'failed to read stdout data from channel: ', self.getError());
         }
