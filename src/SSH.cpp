@@ -237,9 +237,7 @@ VarSFTPSessionRef *VarSSHSession::newSFTPSession(VirtualMachine &vm, ModuleLoc l
 FERAL_FUNC(sshGetLogLevel, 0, false,
            "  fn() -> Int\n"
            "Returns the log level of the SSH library as an Int.")
-{
-    return vm.makeVar<VarInt>(loc, ssh_get_log_level());
-}
+{ return vm.makeVar<VarInt>(loc, ssh_get_log_level()); }
 
 FERAL_FUNC(sshSetLogLevel, 0, false,
            "  fn(level) -> Nil\n"
@@ -304,7 +302,8 @@ FERAL_FUNC(sessionSetOptNative, 2, false,
     switch(opt) {
     case SSH_OPTIONS_HOST:
     case SSH_OPTIONS_PORT_STR:
-    case SSH_OPTIONS_USER: {
+    case SSH_OPTIONS_USER:
+    case SSH_OPTIONS_IDENTITY: {
         EXPECT(VarStr, args[2], "value");
         const String &val = as<VarStr>(args[2])->getVal();
         res               = ssh->setOpt(vm, opt, val.c_str());
@@ -533,9 +532,7 @@ FERAL_FUNC(sessionGetErrorCode, 0, false,
 FERAL_FUNC(sshNewKey, 0, false,
            "  fn() -> SSHKey\n"
            "Creates and returns an instance of SSH Key.")
-{
-    return vm.makeVar<VarSSHKey>(loc);
-}
+{ return vm.makeVar<VarSSHKey>(loc); }
 
 FERAL_FUNC(
     keyGetPublicKeyHashNative, 1, false,
@@ -997,6 +994,7 @@ INIT_DLL(SSH)
     vm.makeLocal<VarInt>(loc, "OPT_HOST", "", SSH_OPTIONS_HOST);
     vm.makeLocal<VarInt>(loc, "OPT_PORT", "", SSH_OPTIONS_PORT);
     vm.makeLocal<VarInt>(loc, "OPT_USER", "", SSH_OPTIONS_USER);
+    vm.makeLocal<VarInt>(loc, "OPT_IDENTITY", "", SSH_OPTIONS_IDENTITY);
     vm.makeLocal<VarInt>(loc, "OPT_LOG_VERBOSITY", "", SSH_OPTIONS_LOG_VERBOSITY);
     // log levels
     vm.makeLocal<VarInt>(loc, "LOG_NOLOG", "No logging at all", SSH_LOG_NOLOG);
