@@ -31,7 +31,7 @@ void SSHLoggingCallback(int priority, const char *function, const char *buffer, 
 ////////////////////////////////////////// VarSSHKey /////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-VarSSHKey::VarSSHKey(ModuleLoc loc) : Var(loc, 0), val(nullptr) {}
+VarSSHKey::VarSSHKey(ModuleLoc loc) : Var(loc), val(nullptr) {}
 
 void VarSSHKey::onDestroy(VirtualMachine &vm) { clear(); }
 
@@ -40,7 +40,7 @@ void VarSSHKey::onDestroy(VirtualMachine &vm) { clear(); }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 VarSSHChannelRef::VarSSHChannelRef(ModuleLoc loc, ssh_session ssh, ssh_channel val)
-    : Var(loc, 0), ssh(ssh), val(val), valid(true)
+    : Var(loc), ssh(ssh), val(val), valid(true)
 {}
 
 void VarSSHChannelRef::onDestroy(VirtualMachine &vm) { close(); }
@@ -86,7 +86,7 @@ int VarSSHChannelRef::write(StringRef data, bool writeStderr)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 VarSFTPFileHandle::VarSFTPFileHandle(ModuleLoc loc, sftp_file val)
-    : Var(loc, 0), val(val), isOpen(true)
+    : Var(loc), val(val), isOpen(true)
 {}
 void VarSFTPFileHandle::onDestroy(VirtualMachine &vm) { close(); }
 
@@ -94,8 +94,7 @@ void VarSFTPFileHandle::onDestroy(VirtualMachine &vm) { close(); }
 ///////////////////////////////////// VarSFTPDirHandle ///////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-VarSFTPDirHandle::VarSFTPDirHandle(ModuleLoc loc, sftp_dir val)
-    : Var(loc, 0), val(val), isOpen(true)
+VarSFTPDirHandle::VarSFTPDirHandle(ModuleLoc loc, sftp_dir val) : Var(loc), val(val), isOpen(true)
 {}
 void VarSFTPDirHandle::onDestroy(VirtualMachine &vm) { close(); }
 
@@ -104,7 +103,7 @@ void VarSFTPDirHandle::onDestroy(VirtualMachine &vm) { close(); }
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 VarSFTPSessionRef::VarSFTPSessionRef(ModuleLoc loc, sftp_session val)
-    : Var(loc, 0), val(val), valid(true)
+    : Var(loc), val(val), valid(true)
 {}
 
 void VarSFTPSessionRef::onDestroy(VirtualMachine &vm) { sftp_free(val); }
@@ -157,7 +156,7 @@ int VarSFTPSessionRef::readFile(VarSFTPFileHandle *file, VarStr *data)
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 VarSSHSession::VarSSHSession(ModuleLoc loc, ssh_session val)
-    : Var(loc, 0), vm(nullptr), logCB(nullptr), cbPrio(nullptr), cbFunc(nullptr), cbBuf(nullptr),
+    : Var(loc), vm(nullptr), logCB(nullptr), cbPrio(nullptr), cbFunc(nullptr), cbBuf(nullptr),
       val(val), connected(false)
 {}
 
@@ -237,7 +236,9 @@ VarSFTPSessionRef *VarSSHSession::newSFTPSession(VirtualMachine &vm, ModuleLoc l
 FERAL_FUNC(sshGetLogLevel, 0, false,
            "  fn() -> Int\n"
            "Returns the log level of the SSH library as an Int.")
-{ return vm.makeVar<VarInt>(loc, ssh_get_log_level()); }
+{
+    return vm.makeVar<VarInt>(loc, ssh_get_log_level());
+}
 
 FERAL_FUNC(sshSetLogLevel, 0, false,
            "  fn(level) -> Nil\n"
@@ -532,7 +533,9 @@ FERAL_FUNC(sessionGetErrorCode, 0, false,
 FERAL_FUNC(sshNewKey, 0, false,
            "  fn() -> SSHKey\n"
            "Creates and returns an instance of SSH Key.")
-{ return vm.makeVar<VarSSHKey>(loc); }
+{
+    return vm.makeVar<VarSSHKey>(loc);
+}
 
 FERAL_FUNC(
     keyGetPublicKeyHashNative, 1, false,
