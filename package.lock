@@ -1,9 +1,8 @@
 deps = [
     {
         isFeral = false;
-        linkAs = "libssh";
-        url = "";
         sha256 = "";
+        url = "";
         constraint = ">=0.12.0";
         name = "libssh";
     }

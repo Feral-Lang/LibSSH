@@ -1,4 +1,3 @@
-let cxx = import('std/cxx');
 let vec = import('std/vec');
 let package = import('std/package');
 
@@ -10,10 +9,5 @@ let pkg = package.new(
     author = vec.new('Chirag-Khandelwal <github@mail.chiragkh.me>')
 );
 
-let ssh = cxx.findLibrary('libssh', version = '>=0.12.0').ok();
-
-let ext = cxx.newExt('SSH');
-ext.requires(ssh);
-ext.addSources('lib/SSH.cpp'.path());
-
-pkg.addTarget(ext);
+pkg.requires('libssh', version = '>=0.12.0');
+pkg.addTarget('SSH', 'SSH.cpp');

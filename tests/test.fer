@@ -15,11 +15,11 @@ let try = fn(res, msg...) {
     raise('error (', res.getVal().getCode(), '): ', res.getVal().getMsg());
 };
 
-let args = argparse.new(feral.args);
-args.addArg('host').setValReqd(true).setReqd(true).setHelp('Hostname to connect to');
-args.addArg('port').setValReqd(true).setHelp('Port on the host to connect to');
-args.addArg('user').setValReqd(true).setHelp('User on the host to connect to');
-args.parse();
+let args = argparse.new('ssh test');
+args.addPos('host').setReqd(true).setHelp('Hostname to connect to');
+args.addPos('port').setHelp('Port on the host to connect to');
+args.addPos('user').setHelp('User on the host to connect to');
+args.parse(feral.args);
 
 let conn = ssh.new();
 try(conn.setOpt(ssh.OPT_HOST, args.getValue('host')), 'setting host');
