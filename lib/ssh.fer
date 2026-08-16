@@ -252,7 +252,7 @@ Returns `Result.ok(sftpSession)` on success, `Result.err(code, msg)` on failure.
 let initSFTP in SSHSessionTy = fn() {
     let chanRes = self.openChannel(type = 'sftp');
     if !chanRes.isOk() { return chanRes; }
-    let sftp = self.newSFTPSessionNative(chanRes.getVal());
+    let sftp = self.newSFTPSessionNative(chanRes.val());
     let rc = sftp.initNative();
     if rc != OK {
         return result.err(rc, 'failed to initialize SFTP session: ', self.getError());
@@ -462,7 +462,7 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let verifyKnownHost = fn(session) {
     let keyRes = session.getServerPublicKey();
     if !keyRes.isOk() { return keyRes; }
-    let hashRes = keyRes.getVal().getHash();
+    let hashRes = keyRes.val().getHash();
     if !hashRes.isOk() { return hashRes; }
     let knownState = session.isKnownServer();
     if knownState == KNOWN_HOSTS_OK { return result.ok(); }
@@ -478,7 +478,7 @@ let verifyKnownHost = fn(session) {
         if knownState == KNOWN_HOSTS_NOT_FOUND {
             io.println('could not find known hosts file, will automatically create it if trusted');
         }
-        io.println('server unknown, do you trust the host key with hash: ', hashRes.getVal(), '?');
+        io.println('server unknown, do you trust the host key with hash: ', hashRes.val(), '?');
         let input = io.scan('yes', 'no', icase = true);
         if input.lower() == 'no' {
             return result.err(knownState, 'not updating known hosts');
@@ -499,7 +499,7 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authenticate = fn(session) {
     # authNone must be called before authList()
     let res = session.authNone();
-    if res.isOk() || res.getVal().getCode() == ERROR { return res; }
+    if res.isOk() || res.val().code() == ERROR { return res; }
     let methods = session.authList();
     if methods & AUTH_METHOD_NONE {
         let res = session.authNone();
@@ -511,7 +511,7 @@ let authenticate = fn(session) {
     }
     if methods & AUTH_METHOD_INTERACTIVE {
         let res = session.authKbdInt();
-        while res.isErr() && res.getVal().getCode() == AUTH_INFO {
+        while res.isErr() && res.val().code() == AUTH_INFO {
             let nprompts = session.authKbdIntGetNPrompts();
             let name = session.authKbdIntGetName();
             let instr = session.authKbdIntGetInstruction();

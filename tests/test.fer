@@ -9,10 +9,10 @@ let try = fn(res, msg...) {
     io.print('==> ', msg..., ' ... ');
     if res.isOk() {
         io.println('success!');
-        return res.getVal();
+        return res.val();
     }
     io.println('failed!');
-    raise('error (', res.getVal().getCode(), '): ', res.getVal().getMsg());
+    raise('error (', res.val().code(), '): ', res.val().msg());
 };
 
 let args = argparse.new('ssh test');

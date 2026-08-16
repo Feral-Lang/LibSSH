@@ -1,13 +1,20 @@
 let vec = import('std/vec');
 let package = import('std/package');
 
-let pkg = package.new(
-    name = 'SSH',
-    desc = 'SSH connection and scripting using Feral.',
-    version = '0.1.0',
-    feral = '>=2.1.1',
-    author = vec.new('Chirag-Khandelwal <github@mail.chiragkh.me>')
-);
+let configure = fn(info) {
+    let pkg = package.new(
+        'SSH',
+        desc = 'SSH connection and scripting using Feral.',
+        version = '0.2.0',
+        feral = '>=2.4.1',
+        author = vec.new('Chirag-Khandelwal <github@mail.chiragkh.me>')
+    );
 
-pkg.requires('libssh', version = '>=0.12.0');
-pkg.addTarget('SSH', 'SSH.cpp');
+    pkg.requires('libssh', version = '~0.12.0');
+
+    let sshLib = pkg.addTarget('SSH');
+    sshLib.findHeaders(info.pkgRoot / 'lib', '(.*).hpp');
+    sshLib.findSources(info.pkgRoot / 'lib', '(.*).cpp');
+
+    return feral.ok(pkg);
+};
