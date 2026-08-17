@@ -4,7 +4,6 @@ let io = import('std/io');
 let fs = import('std/fs');
 let os = import('std/os');
 let vec = import('std/vec');
-let result = import('std/result');
 
 let SENTINEL_STDOUT = '<<<CMD__COMPLETE__STDOUT:$?>>>';
 let SENTINEL_STDOUT_PREFIX = '<<<CMD__COMPLETE__STDOUT:';
@@ -57,9 +56,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let connect in SSHSessionTy = fn() {
     let rc = self.connectNative();
     if rc != OK {
-        return result.err(rc, 'failed to connect: ', self.getError());
+        return feral.err(rc, 'failed to connect: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -70,9 +69,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let setOpt in SSHSessionTy = fn(opt, val) {
     let rc = self.setOptNative(opt, val);
     if rc != OK {
-        return result.err(rc, 'failed to set option: ', self.getError());
+        return feral.err(rc, 'failed to set option: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -84,9 +83,9 @@ let getServerPublicKey in SSHSessionTy = fn() {
     let key = newKey();
     let rc = self.getServerPublicKeyNative(key);
     if rc != OK {
-        return result.err(rc, 'failed to get server public key: ', self.getError());
+        return feral.err(rc, 'failed to get server public key: ', self.getError());
     }
-    return result.ok(ref(key));
+    return feral.ok(ref(key));
 };
 
 "
@@ -97,9 +96,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let updateKnownHosts in SSHSessionTy = fn() {
     let rc = self.updateKnownHostsNative();
     if rc != OK {
-        return result.err(rc, 'failed to update known hosts: ', self.getError());
+        return feral.err(rc, 'failed to update known hosts: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -110,9 +109,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authNone in SSHSessionTy = fn() {
     let rc = self.authNoneNative();
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to perform none-authentication: ', self.getError());
+        return feral.err(rc, 'failed to perform none-authentication: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -124,9 +123,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authTryPublicKey in SSHSessionTy = fn(publicKey) {
     let rc = self.authTryPublicKeyNative(publicKey);
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to authenticate using public key: ', self.getError());
+        return feral.err(rc, 'failed to authenticate using public key: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -137,9 +136,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authPublicKey in SSHSessionTy = fn(privateKey) {
     let rc = self.authPublicKeyNative(privateKey);
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to authenticate using private key: ', self.getError());
+        return feral.err(rc, 'failed to authenticate using private key: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -151,9 +150,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authPublicKeyAuto in SSHSessionTy = fn(passphrase = nil) {
     let rc = self.authPublicKeyAutoNative(passphrase);
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to auto authenticate using public keys: ', self.getError());
+        return feral.err(rc, 'failed to auto authenticate using public keys: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -164,9 +163,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authPassword in SSHSessionTy = fn(password) {
     let rc = self.authPasswordNative(password);
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to authenticate using password: ', self.getError());
+        return feral.err(rc, 'failed to authenticate using password: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -178,12 +177,12 @@ Note that the error code `AUTH_INFO` should be handled using interactive authent
 let authKbdInt in SSHSessionTy = fn() {
     let rc = self.authKbdIntNative();
     if rc == AUTH_INFO {
-        return result.err(rc, 'must continue interactive login by calling member function `authKbdIntGetNPrompts()`');
+        return feral.err(rc, 'must continue interactive login by calling member function `authKbdIntGetNPrompts()`');
     }
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed to authenticate using password: ', self.getError());
+        return feral.err(rc, 'failed to authenticate using password: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -194,9 +193,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let authKbdIntSetAnswer in SSHSessionTy = fn(index, answer) {
     let rc = self.authKbdIntSetAnswerNative(index, answer);
     if rc != AUTH_SUCCESS {
-        return result.err(rc, 'failed using answer for prompt: ', self.getError());
+        return feral.err(rc, 'failed using answer for prompt: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -217,14 +216,14 @@ let openChannel in SSHSessionTy = fn(.kw) {
     let chan = self.newChannelNative();
     let rc = chan.openNative();
     if rc != OK {
-        return result.err(rc, 'failed to open channel: ', self.getError());
+        return feral.err(rc, 'failed to open channel: ', self.getError());
     }
     if interactive {
         let width = kw['width'] ?? 80;
         let height = kw['height'] ?? 24;
         rc = chan.requestPtyNative(width, height);
         if rc != OK {
-            return result.err(rc, 'failed to request pty for channel: ', chan.getError());
+            return feral.err(rc, 'failed to request pty for channel: ', chan.getError());
         }
     }
     if requestType == 'shell' {
@@ -235,13 +234,13 @@ let openChannel in SSHSessionTy = fn(.kw) {
         rc = chan.requestSFTPNative();
     }
     if rc != OK {
-        return result.err(rc, 'failed to open ', requestType, ' on channel: ', chan.getError());
+        return feral.err(rc, 'failed to open ', requestType, ' on channel: ', chan.getError());
     }
     if !interactive && requestType == 'shell' {
         let tmpRes = chan.write('export PS1=\'\'\n');
         if !tmpRes.isOk() { return tmpRes; }
     }
-    return result.ok(chan);
+    return feral.ok(chan);
 };
 
 "
@@ -255,9 +254,9 @@ let initSFTP in SSHSessionTy = fn() {
     let sftp = self.newSFTPSessionNative(chanRes.val());
     let rc = sftp.initNative();
     if rc != OK {
-        return result.err(rc, 'failed to initialize SFTP session: ', self.getError());
+        return feral.err(rc, 'failed to initialize SFTP session: ', self.getError());
     }
-    return result.ok(sftp);
+    return feral.ok(sftp);
 };
 
 ###################################################################################################
@@ -273,9 +272,9 @@ let getHash in SSHKeyTy = fn() {
     let hash = '';
     let rc = self.getHashNative(hash);
     if rc != OK {
-        return result.err(rc, 'failed to get hash: ', self.getError());
+        return feral.err(rc, 'failed to get hash: ', self.getError());
     }
-    return result.ok(hash);
+    return feral.ok(hash);
 };
 
 "
@@ -286,9 +285,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let importPublic in SSHKeyTy = fn(filePath) {
     let rc = self.importPublicNative(filePath);
     if rc != OK {
-        return result.err(rc, 'failed to import public key: ', self.getError());
+        return feral.err(rc, 'failed to import public key: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 "
@@ -299,9 +298,9 @@ Returns `Result.ok()` on success, `Result.err(code, msg)` on failure.
 let importPrivate in SSHKeyTy = fn(filePath, passphrase = nil) {
     let rc = self.importPrivateNative(filePath, passphrase);
     if rc != OK {
-        return result.err(rc, 'failed to import private key: ', self.getError());
+        return feral.err(rc, 'failed to import private key: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 ###################################################################################################
@@ -311,9 +310,9 @@ let importPrivate in SSHKeyTy = fn(filePath, passphrase = nil) {
 let close in SSHChannelTy = fn() {
     let rc = self.closeNative();
     if rc != OK {
-        return result.err(rc, 'failed to close channel: ', self.getError());
+        return feral.err(rc, 'failed to close channel: ', self.getError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 let exec in SSHChannelTy = fn(.kw, command...) {
@@ -334,7 +333,7 @@ let read in SSHChannelTy = fn(.kw) {
         let buf = '';
         let bytes = self.readNative(buf, false, -1);
         if bytes < OK {
-            return result.err(bytes, 'failed to read stdout data from channel: ', self.getError());
+            return feral.err(bytes, 'failed to read stdout data from channel: ', self.getError());
         }
         let sentinelLoc = buf.find(SENTINEL_STDOUT_PREFIX);
         let dataPart = sentinelLoc >= 0 ? buf.sub(0, sentinelLoc) : ref(buf);
@@ -359,7 +358,7 @@ let read in SSHChannelTy = fn(.kw) {
         let buf = '';
         let bytes = self.readNative(buf, true, -1);
         if bytes < OK {
-            return result.err(bytes, 'failed to read stdout data from channel: ', self.getError());
+            return feral.err(bytes, 'failed to read stdout data from channel: ', self.getError());
         }
         let sentinelLoc = buf.find(SENTINEL_STDERR);
         let dataPart = sentinelLoc >= 0 ? buf.sub(0, sentinelLoc) : ref(buf);
@@ -375,15 +374,15 @@ let read in SSHChannelTy = fn(.kw) {
             err = tmp.split('\n');
         }
     }
-    return result.ok(exitCode);
+    return feral.ok(exitCode);
 };
 
 let write in SSHChannelTy = fn(data, toStderr = false) {
     let bytes = self.writeNative(data, toStderr);
     if bytes == ERROR {
-        return result.err(bytes, 'failed to write data to channel: ', self.getError());
+        return feral.err(bytes, 'failed to write data to channel: ', self.getError());
     }
-    return result.ok(bytes);
+    return feral.ok(bytes);
 };
 
 ###################################################################################################
@@ -407,9 +406,9 @@ Returns `Result.ok(writtenBytes)` on success, `Result.err(code, msg)` on failure
 let writeFile in SFTPSessionTy = fn(fileHandle, data) {
     let writtenBytes = self.writeFileNative(fileHandle, data);
     if writtenBytes == ERROR {
-        return result.err(writtenBytes, 'failed to write to file: ', self.getSSHError());
+        return feral.err(writtenBytes, 'failed to write to file: ', self.getSSHError());
     }
-    return result.ok(writtenBytes);
+    return feral.ok(writtenBytes);
 };
 
 "
@@ -421,9 +420,9 @@ let readFile in SFTPSessionTy = fn(fileHandle) {
     let data = '';
     let readBytes = self.readFileNative(fileHandle, data);
     if readBytes == ERROR {
-        return result.err(readBytes, 'failed to read file: ', self.getSSHError());
+        return feral.err(readBytes, 'failed to read file: ', self.getSSHError());
     }
-    return result.ok(data);
+    return feral.ok(data);
 };
 
 ###################################################################################################
@@ -433,9 +432,9 @@ let readFile in SFTPSessionTy = fn(fileHandle) {
 let close in SFTPFileHandleTy = fn() {
     let rc = self.closeNative();
     if rc != OK {
-        return result.err(rc, 'failed to close file: ', self.getSSHError());
+        return feral.err(rc, 'failed to close file: ', self.getSSHError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 ###################################################################################################
@@ -445,9 +444,9 @@ let close in SFTPFileHandleTy = fn() {
 let close in SFTPDirHandleTy = fn() {
     let rc = self.closeNative();
     if rc != OK {
-        return result.err(rc, 'failed to close dir: ', self.getSSHError());
+        return feral.err(rc, 'failed to close dir: ', self.getSSHError());
     }
-    return result.ok();
+    return feral.ok();
 };
 
 ###################################################################################################
@@ -465,14 +464,14 @@ let verifyKnownHost = fn(session) {
     let hashRes = keyRes.val().getHash();
     if !hashRes.isOk() { return hashRes; }
     let knownState = session.isKnownServer();
-    if knownState == KNOWN_HOSTS_OK { return result.ok(); }
+    if knownState == KNOWN_HOSTS_OK { return feral.ok(); }
     if knownState == KNOWN_HOSTS_CHANGED {
-        return result.err(knownState, 'known hosts hash for the server has changed, the new value is: ', hash);
+        return feral.err(knownState, 'known hosts hash for the server has changed, the new value is: ', hash);
     }
     if knownState == KNOWN_HOSTS_OTHER {
         let e = 'host key for this server was not found, but other exists;';
         e += ' might be an attacker who changed the default server key to confuse your client';
-        return result.err(knownState, e);
+        return feral.err(knownState, e);
     }
     if knownState == KNOWN_HOSTS_NOT_FOUND || knownState == KNOWN_HOSTS_UNKNOWN {
         if knownState == KNOWN_HOSTS_NOT_FOUND {
@@ -481,14 +480,14 @@ let verifyKnownHost = fn(session) {
         io.println('server unknown, do you trust the host key with hash: ', hashRes.val(), '?');
         let input = io.scan('yes', 'no', icase = true);
         if input.lower() == 'no' {
-            return result.err(knownState, 'not updating known hosts');
+            return feral.err(knownState, 'not updating known hosts');
         }
         let res = session.updateKnownHosts();
         if !res.isOk() { return res; }
-        return result.ok();
+        return feral.ok();
     }
     # knownState == KNOWN_HOSTS_ERROR
-    return result.err(knownState, 'ssh error: ', session.getError());
+    return feral.err(knownState, 'ssh error: ', session.getError());
 };
 
 "
@@ -536,5 +535,5 @@ let authenticate = fn(session) {
         let res = session.authPassword(password);
         if res.isOk() { return res; }
     }
-    return result.err(AUTH_ERROR, 'failed to authenticate');
+    return feral.err(AUTH_ERROR, 'failed to authenticate');
 };
