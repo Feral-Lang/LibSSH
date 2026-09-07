@@ -192,8 +192,9 @@ public:
 
     VarSFTPDirHandle *openDir(VirtualMachine &vm, ModuleLoc loc, VarStr *path);
 
-    int writeFile(VarSFTPFileHandle *file, VarStr *data);
-    int readFile(VarSFTPFileHandle *file, VarStr *data);
+    int writeFile(VarSFTPFileHandle *file, VarBytebuffer *data);
+    int readFile(VarSFTPFileHandle *file, VarBytebuffer *data);
+    size_t sizeFile(VarSFTPFileHandle *file);
 
     inline bool isValid() { return valid; }
 

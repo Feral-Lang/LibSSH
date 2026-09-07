@@ -4,6 +4,7 @@ let io = import('std/io');
 let fs = import('std/fs');
 let os = import('std/os');
 let vec = import('std/vec');
+let bytebuffer = import('std/bytebuffer');
 
 let SENTINEL_STDOUT = '<<<CMD__COMPLETE__STDOUT:$?>>>';
 let SENTINEL_STDOUT_PREFIX = '<<<CMD__COMPLETE__STDOUT:';
@@ -400,7 +401,7 @@ let openFile in SFTPSessionTy = fn(path, mode = fs.O_RDONLY, perms = 0) {
 
 "
   var.fn(fileHandle, data) -> Result
-Writes `data` into file `fileHandle`.
+Writes a bytebuffer `data` into file `fileHandle`.
 Returns `Result.ok(writtenBytes)` on success, `Result.err(code, msg)` on failure.
 "
 let writeFile in SFTPSessionTy = fn(fileHandle, data) {
@@ -413,15 +414,26 @@ let writeFile in SFTPSessionTy = fn(fileHandle, data) {
 
 "
   var.fn(fileHandle) -> Result
-Reads the file `fileHandle`.
+Reads the file `fileHandle` into a bytebuffer.
 Returns `Result.ok(data)` on success, `Result.err(code, msg)` on failure.
 "
 let readFile in SFTPSessionTy = fn(fileHandle) {
-    let data = '';
+    let sz = self.sizeFile(fileHandle).?;
+    let data = bytebuffer.new(sz);
     let readBytes = self.readFileNative(fileHandle, data);
     if readBytes == ERROR {
         return feral.err(readBytes, 'failed to read file: ', self.getSSHError());
     }
+    return feral.ok(data);
+};
+
+"
+  var.fn(fileHandle) -> Result
+Reads the size of file `fileHandle` as an integer.
+Returns `Result.ok(data)` on success, `Result.err(code, msg)` on failure.
+"
+let sizeFile in SFTPSessionTy = fn(fileHandle) {
+    let data = self.sizeFileNative(fileHandle);
     return feral.ok(data);
 };
 

@@ -129,26 +129,33 @@ VarSFTPDirHandle *VarSFTPSessionRef::openDir(VirtualMachine &vm, ModuleLoc loc, 
     return vm.makeVar<VarSFTPDirHandle>(loc, dir);
 }
 
-int VarSFTPSessionRef::writeFile(VarSFTPFileHandle *file, VarStr *data)
+int VarSFTPSessionRef::writeFile(VarSFTPFileHandle *file, VarBytebuffer *data)
 {
-    StringRef s = data->getVal();
-    int written = sftp_write(file->getVal(), s.data(), s.size());
-    if(written != s.size()) return SSH_ERROR;
+    int written = sftp_write(file->getVal(), data->getVal(), data->size());
+    if(written != data->size()) return SSH_ERROR;
     return written;
 }
 
-int VarSFTPSessionRef::readFile(VarSFTPFileHandle *file, VarStr *data)
+int VarSFTPSessionRef::readFile(VarSFTPFileHandle *file, VarBytebuffer *data)
 {
-    // Good buffer size apparently.
-    char buffer[16384];
-    size_t prevSz = data->getVal().size();
+    size_t written = 0;
     for(;;) {
-        int nbytes = sftp_read(file->getVal(), buffer, sizeof(buffer));
+        int nbytes =
+            sftp_read(file->getVal(), data->getVal() + written, data->capacity() - written);
         if(!nbytes) break; // EOF
         if(nbytes < 0) return SSH_ERROR;
-        data->getVal().append(buffer, nbytes);
+        written += nbytes;
     }
-    return data->getVal().size() - prevSz;
+    if(written > 0) data->setLen(written);
+    return written;
+}
+
+size_t VarSFTPSessionRef::sizeFile(VarSFTPFileHandle *file)
+{
+    sftp_attributes attr = sftp_fstat(file->getVal());
+    size_t sz            = attr->size;
+    sftp_attributes_free(attr);
+    return sz;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -756,28 +763,38 @@ FERAL_FUNC(sftpSessionOpenFileNative, 3, false,
 
 FERAL_FUNC(sftpSessionWriteFileNative, 2, false,
            "  var.fn(fileHandle, data) -> Int\n"
-           "Writes `data` into file `fileHandle`.\n"
+           "Writes `data` which is a bytebuffer into file `fileHandle`.\n"
            "Returns number of written bytes or `ERROR` on failure.")
 {
     EXPECT(VarSFTPFileHandle, args[1], "file handle");
-    EXPECT(VarStr, args[2], "data");
+    EXPECT(VarBytebuffer, args[2], "data");
     VarSFTPSessionRef *sftp = as<VarSFTPSessionRef>(args[0]);
     VarSFTPFileHandle *file = as<VarSFTPFileHandle>(args[1]);
-    VarStr *data            = as<VarStr>(args[2]);
+    VarBytebuffer *data     = as<VarBytebuffer>(args[2]);
     return vm.makeVar<VarInt>(loc, sftp->writeFile(file, data));
 }
 
 FERAL_FUNC(sftpSessionReadFileNative, 2, false,
            "  var.fn(fileHandle, data) -> Int\n"
-           "Reads file `fileHandle` into `data`.\n"
+           "Reads file `fileHandle` into `data` which is a bytebuffer.\n"
            "Returns number of read bytes or `ERROR` on failure.")
 {
     EXPECT(VarSFTPFileHandle, args[1], "file handle");
-    EXPECT(VarStr, args[2], "data");
+    EXPECT(VarBytebuffer, args[2], "data");
     VarSFTPSessionRef *sftp = as<VarSFTPSessionRef>(args[0]);
     VarSFTPFileHandle *file = as<VarSFTPFileHandle>(args[1]);
-    VarStr *data            = as<VarStr>(args[2]);
+    VarBytebuffer *data     = as<VarBytebuffer>(args[2]);
     return vm.makeVar<VarInt>(loc, sftp->readFile(file, data));
+}
+
+FERAL_FUNC(sftpSessionSizeFileNative, 1, false,
+           "  var.fn(fileHandle) -> Int\n"
+           "Returns the size of file represented by `fileHandle`.")
+{
+    EXPECT(VarSFTPFileHandle, args[1], "file handle");
+    VarSFTPSessionRef *sftp = as<VarSFTPSessionRef>(args[0]);
+    VarSFTPFileHandle *file = as<VarSFTPFileHandle>(args[1]);
+    return vm.makeVar<VarInt>(loc, sftp->sizeFile(file));
 }
 
 FERAL_FUNC(sftpSessionOpenDir, 1, false,
@@ -971,6 +988,7 @@ INIT_DLL(SSH)
     vm.addTypeFn<VarSFTPSessionRef>(loc, "openFileNative", sftpSessionOpenFileNative);
     vm.addTypeFn<VarSFTPSessionRef>(loc, "writeFileNative", sftpSessionWriteFileNative);
     vm.addTypeFn<VarSFTPSessionRef>(loc, "readFileNative", sftpSessionReadFileNative);
+    vm.addTypeFn<VarSFTPSessionRef>(loc, "sizeFileNative", sftpSessionSizeFileNative);
     vm.addTypeFn<VarSFTPSessionRef>(loc, "openDir", sftpSessionOpenDir);
     vm.addTypeFn<VarSFTPSessionRef>(loc, "getError", sftpSessionGetError);
     vm.addTypeFn<VarSFTPSessionRef>(loc, "getErrorCode", sftpSessionGetErrorCode);

@@ -59,8 +59,11 @@ io.println('==> $HOME => ', homePath);
 
 let sftp = try(conn.initSFTP(), 'initializing SFTP');
 let f = sftp.openFile(homePath / '.zshrc');
+let zshrcSz = try(sftp.sizeFile(f), 'reading size of ~/.zshrc');
+io.println('==> file size: ', zshrcSz);
 let zshrcData = try(sftp.readFile(f), 'reading ~/.zshrc');
 let tmpF = sftp.openFile(homePath / '.zshrcTmp', fs.O_CREAT | fs.O_WRONLY, 0600);
+io.println('==> content size: ', zshrcData.len());
 io.println('==> contents:\n', zshrcData);
 let written = try(sftp.writeFile(tmpF, zshrcData), 'writing ~/.zshrcTmp');
 io.println('==> written ~/.zshrcTmp: ', written, ' bytes');
