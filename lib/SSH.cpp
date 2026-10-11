@@ -61,14 +61,13 @@ int VarSSHChannelRef::close()
 
 int VarSSHChannelRef::read(VarStr *output, VarInt *timeoutMS, bool readStderr)
 {
-    String &data = output->getVal();
-    int timeout  = timeoutMS->getVal();
+    int timeout = timeoutMS->getVal();
     char buffer[128];
     int nbytes = sizeof(buffer);
     // Loop is so that if full buffer is read, assume more may be present and read it.
     while(nbytes == sizeof(buffer)) {
         nbytes = ssh_channel_read_timeout(val, buffer, sizeof(buffer), readStderr ? 1 : 0, timeout);
-        if(nbytes > 0) data.append(buffer, nbytes);
+        if(nbytes > 0) output->append(StringRef(buffer, nbytes));
     }
     return nbytes;
 }
@@ -111,7 +110,7 @@ void VarSFTPSessionRef::onDestroy(VirtualMachine &vm) { sftp_free(val); }
 VarSFTPFileHandle *VarSFTPSessionRef::openFile(VirtualMachine &vm, ModuleLoc loc, VarStr *path,
                                                VarInt *mode, VarInt *perms)
 {
-    sftp_file file = sftp_open(val, path->getVal().c_str(), mode->getVal(), perms->getVal());
+    sftp_file file = sftp_open(val, path->cStr(), mode->getVal(), perms->getVal());
     if(!file) {
         vm.fail(loc, "failed to open SFTP file `", path->getVal(), "`: ", getSSHError());
         return nullptr;
@@ -121,7 +120,7 @@ VarSFTPFileHandle *VarSFTPSessionRef::openFile(VirtualMachine &vm, ModuleLoc loc
 
 VarSFTPDirHandle *VarSFTPSessionRef::openDir(VirtualMachine &vm, ModuleLoc loc, VarStr *path)
 {
-    sftp_dir dir = sftp_opendir(val, path->getVal().c_str());
+    sftp_dir dir = sftp_opendir(val, path->cStr());
     if(!dir) {
         vm.fail(loc, "failed to open SFTP dir `", path->getVal(), "`: ", getSSHError());
         return nullptr;
@@ -243,9 +242,7 @@ VarSFTPSessionRef *VarSSHSession::newSFTPSession(VirtualMachine &vm, ModuleLoc l
 FERAL_FUNC(sshGetLogLevel, 0, false,
            "  fn() -> Int\n"
            "Returns the log level of the SSH library as an Int.")
-{
-    return vm.makeVar<VarInt>(loc, ssh_get_log_level());
-}
+{ return vm.makeVar<VarInt>(loc, ssh_get_log_level()); }
 
 FERAL_FUNC(sshSetLogLevel, 0, false,
            "  fn(level) -> Nil\n"
@@ -313,8 +310,7 @@ FERAL_FUNC(sessionSetOptNative, 2, false,
     case SSH_OPTIONS_USER:
     case SSH_OPTIONS_IDENTITY: {
         EXPECT(VarStr, args[2], "value");
-        const String &val = as<VarStr>(args[2])->getVal();
-        res               = ssh->setOpt(vm, opt, val.c_str());
+        res = ssh->setOpt(vm, opt, as<VarStr>(args[2])->cStr());
         break;
     }
     case SSH_OPTIONS_PORT:
@@ -540,9 +536,7 @@ FERAL_FUNC(sessionGetErrorCode, 0, false,
 FERAL_FUNC(sshNewKey, 0, false,
            "  fn() -> SSHKey\n"
            "Creates and returns an instance of SSH Key.")
-{
-    return vm.makeVar<VarSSHKey>(loc);
-}
+{ return vm.makeVar<VarSSHKey>(loc); }
 
 FERAL_FUNC(
     keyGetPublicKeyHashNative, 1, false,
@@ -881,7 +875,7 @@ FERAL_FUNC(sftpFileGetSSHErrorCode, 0, false,
            "Returns the last error code in SSH session associated with SFTP file `var` as Int.")
 {
     VarSFTPFileHandle *handle = as<VarSFTPFileHandle>(args[0]);
-    return vm.makeVar<VarStr>(loc, ssh_get_error_code(handle->getVal()->sftp->session));
+    return vm.makeVar<VarInt>(loc, ssh_get_error_code(handle->getVal()->sftp->session));
 }
 
 /////////////////////////////////////////// SFTP Dir //////////////////////////////////////////////
@@ -916,7 +910,7 @@ FERAL_FUNC(sftpDirGetSSHErrorCode, 0, false,
            "Returns the last error code in SSH session associated with SFTP dir `var` as Int.")
 {
     VarSFTPDirHandle *handle = as<VarSFTPDirHandle>(args[0]);
-    return vm.makeVar<VarStr>(loc, ssh_get_error_code(handle->getVal()->sftp->session));
+    return vm.makeVar<VarInt>(loc, ssh_get_error_code(handle->getVal()->sftp->session));
 }
 
 INIT_DLL(SSH)

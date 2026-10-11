@@ -21,16 +21,15 @@ public:
     inline int importPublic(VarStr *fileName)
     {
         clear();
-        return ssh_pki_import_pubkey_file(fileName->getVal().c_str(), &val);
+        return ssh_pki_import_pubkey_file(fileName->cStr(), &val);
     }
 
     // passphrase can be nullptr
     inline int importPrivate(VarStr *fileName, VarStr *passphrase)
     {
         clear();
-        return ssh_pki_import_privkey_file(fileName->getVal().c_str(),
-                                           passphrase ? passphrase->getVal().c_str() : nullptr,
-                                           nullptr, nullptr, &val);
+        return ssh_pki_import_privkey_file(
+            fileName->cStr(), passphrase ? passphrase->cStr() : nullptr, nullptr, nullptr, &val);
     }
 
     inline const char *getError() { return ssh_get_error(val); }
@@ -283,14 +282,13 @@ public:
     inline int userAuthPublicKeyAuto(VirtualMachine &vm, VarStr *passphrase)
     {
         this->vm = &vm;
-        return ssh_userauth_publickey_auto(val, nullptr,
-                                           passphrase ? passphrase->getVal().c_str() : nullptr);
+        return ssh_userauth_publickey_auto(val, nullptr, passphrase ? passphrase->cStr() : nullptr);
     }
 
     inline int userAuthPassword(VirtualMachine &vm, VarStr *password)
     {
         this->vm = &vm;
-        return ssh_userauth_password(val, nullptr, password->getVal().c_str());
+        return ssh_userauth_password(val, nullptr, password->cStr());
     }
 
     inline int userAuthKbdInt(VirtualMachine &vm)
@@ -329,7 +327,7 @@ public:
     inline int userAuthKbdIntSetAnswer(VirtualMachine &vm, VarInt *index, VarStr *answer)
     {
         this->vm = &vm;
-        return ssh_userauth_kbdint_setanswer(val, index->getVal(), answer->getVal().c_str());
+        return ssh_userauth_kbdint_setanswer(val, index->getVal(), answer->cStr());
     }
 
     // must free the returned char* IF NOT nullptr.
